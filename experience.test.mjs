@@ -1,6 +1,23 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {validContext,validPreferences,goalStatus,unusualChanges,validPhoto,validDate} from './dist/experience-model.js';
+import {assessChange,journeyComparison} from './dist/journey-model.js';
+test('classificação respeita objetivos, metas ultrapassadas, ausências e métodos',()=>{
+assert.equal(assessChange(80,82).status,'unrated');
+assert.equal(assessChange(80,82,{direction:'increase'}).status,'improved');
+assert.equal(assessChange(80,82,{direction:'decrease'}).status,'worsened');
+assert.equal(assessChange(80,80,{direction:'decrease'}).status,'maintained');
+assert.equal(assessChange(null,80).status,'missing');
+assert.equal(assessChange(20,18,{direction:'decrease',comparable:false}).status,'incompatible');
+assert.equal(assessChange(80,70,{target:75}).status,'equal-distance');
+assert.equal(assessChange(80,60,{target:75}).status,'worsened');
+assert.equal(assessChange(80,76,{target:75}).status,'improved');
+assert.equal(assessChange(80,81,{direction:'maintain'}).status,'worsened');
+const records=[{id:'b',date:'2026-02-01',weight:90,waist:85,notes:''},{id:'c',date:'2026-03-01',weight:82,notes:''},{id:'a',date:'2026-01-01',weight:80,waist:90,notes:''}];
+const result=journeyComparison(records,[{metric:'weight',target:85}],{});
+assert.equal(result.first.id,'a');assert.equal(result.last.id,'c');assert.equal(result.rows.find(r=>r.key==='weight').status,'improved');assert.equal(result.rows.find(r=>r.key==='waist').status,'missing');assert.equal(result.rows.find(r=>r.key==='waist').end,undefined);assert.equal(records[0].id,'b');assert.equal(journeyComparison(records.slice(0,1)),null);
+const manual=journeyComparison([{...records[2],fat:20},{...records[1],fat:18}],[],{fat:'decrease'});assert.equal(manual.rows.find(r=>r.key==='fat').status,'incompatible');
+});
 test('contexto, datas e metas rejeitam dados inválidos e preservam ausências',()=>{
 assert.equal(validDate('2026-02-30'),false);assert.equal(validDate('2024-02-29'),true);
 assert.equal(validContext({time:'25:00'}),false);assert.equal(validContext({conditions:'x'.repeat(301)}),false);assert.equal(validContext({time:'09:30',training:'rest',conditions:'Mesma fita'}),true);

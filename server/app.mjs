@@ -118,7 +118,7 @@ export async function createApp({databasePath='./data/forma.sqlite',origin='http
         throw fail(404,'Rota não encontrada.');
       }
       if(!['GET','HEAD'].includes(req.method))throw fail(405,'Método não permitido.');
-      const allowed=new Set(['index.html','app.js','calculations.js','progress.js','progress-model.js','style.css','progress.css','storage.js','auth.css','refresh.css','experience.js','experience-model.js','experience.css']);
+      const allowed=new Set(['index.html','app.js','calculations.js','progress.js','progress-model.js','style.css','progress.css','storage.js','auth.css','refresh.css','experience.js','experience-model.js','experience.css','journey.js','journey-model.js']);
       const filename=route==='/'?'index.html':route.slice(1);if(!allowed.has(filename))throw fail(404,'Arquivo não encontrado.');
       const data=await readFile(path.join(publicDir,filename));res.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[path.extname(filename)]);res.writeHead(200);res.end(req.method==='HEAD'?undefined:data);
     }catch(error){if(res.headersSent){res.end();return;}if(!error.status)console.error('Falha interna:',error.code||error.name);json(res,error.status||500,{error:error.status?error.message:'Não foi possível concluir a operação. Tente novamente.'});}
