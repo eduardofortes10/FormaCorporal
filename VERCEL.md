@@ -7,6 +7,7 @@ A versão Node + SQLite não funciona como banco persistente em funções da Ver
 1. Crie uma conta em https://supabase.com e um projeto gratuito.
 2. Guarde a senha do banco de forma privada. Ela não precisa ser enviada ao GitHub nem colocada no frontend.
 3. No **SQL Editor**, execute o conteúdo de `supabase/migrations/001_assessments.sql` uma vez. A migração cria a tabela, as regras por usuário e a função de gravação com controle de versão.
+   Depois execute `supabase/migrations/002_experience.sql` para ativar contexto das medições, metas, lembretes e fotos privadas. Se a primeira migração já foi aplicada, execute **somente a 002**. Ela preserva as avaliações existentes e pode ser reaplicada.
 4. Em **Connect** ou **Settings → API**, copie a Project URL e a chave **publishable** (ou a antiga **anon**). Nunca use `service_role` ou `sb_secret_...`.
 
 ## 2. Configurar a Vercel
@@ -54,3 +55,20 @@ Isso é **Deployment Protection**, anterior ao aplicativo. O login da Vercel é 
 ## Verificação desta entrega
 
 O build, a integração da interface e a migração PostgreSQL podem ser testados localmente. A ativação e os testes no projeto Supabase real dependem da criação do projeto, execução do SQL e configuração das variáveis. `npm test` mantém os testes da versão Node; `npm run test:cloud` cobre o adaptador e as regras PostgreSQL em um banco de teste PGlite.
+
+## Atualização: abas, metas e fotos
+
+Para um projeto já em funcionamento:
+
+1. Abra `supabase/migrations/002_experience.sql` no repositório e copie **todo o arquivo**.
+2. No projeto Supabase, abra **SQL Editor → New query**, cole o conteúdo e clique em **Run**. Não execute novamente a migração 001.
+3. Aguarde o deploy do código atualizado na Vercel e atualize a página.
+4. Crie uma meta e um lembrete, recarregue e confira a persistência. Envie uma foto de teste na aba Fotos e teste a exclusão. Uma segunda conta deve ter a própria galeria vazia.
+
+A migração adiciona `user_preferences`, funções com revisão para evitar sobrescrita entre dispositivos, contexto opcional às avaliações e o bucket **privado** `progress-photos`. A pasta de cada foto é o UUID do usuário; políticas RLS limitam leitura, envio e exclusão à própria conta. Links de visualização duram 60 segundos. Não torne o bucket público. O SQL verifica limite de 40 objetos por conta, e o bucket aceita apenas JPEG até 1 MiB. A interface converte imagens no navegador, reduz a dimensão maior a 1400 px e não preserva EXIF.
+
+O backup JSON existente contém avaliações e contexto; **não inclui metas, lembretes ou fotos**. As fotos podem ser baixadas individualmente. Na versão Node local, o backup SQLite inclui também preferências e imagens. O relatório usa a impressão do navegador: escolha **Salvar como PDF**; fotos e e-mail da conta ficam fora do relatório.
+
+Lembretes são avisos no dashboard, sem envio de e-mail ou push. Metas não são recomendações clínicas. A conferência de alterações acima de 20% é uma regra de interface para encontrar possíveis erros de digitação, não um intervalo fisiológico; o usuário pode manter os valores.
+
+`npm run test:experience` verifica etapas, contexto, comparação por região, consulta de pontos no gráfico, persistência de metas/lembretes, envio/leitura/exclusão de fotos, relatório, responsividade e limpeza no logout. `npm run test:cloud` aplica as duas migrações a um PostgreSQL local de teste, com esquema de Storage simulado, e testa isolamento e quota. Esses testes não substituem a verificação do serviço Storage no Supabase real.

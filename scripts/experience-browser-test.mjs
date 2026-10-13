@@ -1,0 +1,32 @@
+import {chromium} from 'playwright';
+import {createApp} from '../server/app.mjs';
+import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
+const {server}=await createApp({databasePath:':memory:',origin:'http://127.0.0.1:4193'});
+await new Promise(r=>server.listen(4193,'127.0.0.1',r));let browser;
+try{
+browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{})});
+const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
+page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+await page.goto('http://127.0.0.1:4193');
+await page.waitForSelector('#auth-toggle',{timeout:10000}).catch(()=>{throw Error('Startup: '+errors.join('; '));});
+await page.click('#auth-toggle');await page.fill('#auth-form [name=email]','experience@example.com');await page.fill('#auth-form [name=password]','ExperienceTest123!');await page.click('#auth-submit');await page.waitForSelector('#quick-assessment');
+await page.click('#quick-assessment');await page.fill('#form [name=date]','2026-01-01');await page.fill('#form [name=weight]','80');await page.click('[data-step="2"]');await page.fill('#form [name=forearmRight]','31');await page.fill('#form [name=forearmLeft]','30');await page.click('[data-step="4"]');await page.fill('#form [name=contextTime]','08:30');await page.selectOption('#form [name=contextTraining]','before');await page.fill('#form [name=contextConditions]','Mesma balança');await page.fill('#form [name=notes]','Observação privada');await page.click('#form [type=submit]');await page.waitForFunction(()=>!document.querySelector('#dialog').open);
+await page.click('#add');await page.fill('#form [name=date]','2026-02-01');await page.fill('#form [name=weight]','81');await page.click('[data-step="2"]');await page.fill('#form [name=forearmRight]','32');await page.fill('#form [name=forearmLeft]','30.5');await page.click('#form [type=submit]');await page.waitForFunction(()=>!document.querySelector('#dialog').open);
+await page.click('#tab-history');assert.match(await page.locator('#records').innerText(),/08:30.*Antes do treino.*Mesma balança/);
+await page.click('#tab-measures');assert.match(await page.locator('#measure-region-result').innerText(),/1,5 cm/);
+await page.click('#tab-summary');await page.locator('#chart circle').first().click();assert.match(await page.locator('#chart-readout').innerText(),/80 kg/);
+await page.click('#tab-plan');await page.locator('#view-plan summary').click();await page.fill('#goal-form [name=target]','85');await page.fill('#goal-form [name=deadline]','2099-01-01');await page.click('#goal-form button');await page.waitForSelector('.goal-card');await page.fill('#reminder-form [name=reminder]','2099-01-02');await page.click('#reminder-form button[type=submit], #reminder-form .primary');await page.waitForFunction(()=>document.querySelector('#journey-overview').textContent.includes('02/01/2099'));
+await page.reload();await page.waitForSelector('#quick-assessment');await page.waitForFunction(()=>document.querySelector('#journey-overview').textContent.includes('02/01/2099'));await page.click('#tab-plan');assert.equal(await page.locator('.goal-card').count(),1);
+await page.click('#tab-photos');const jpeg=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=100;c.height=150;const x=c.getContext('2d');x.fillStyle='#71964a';x.fillRect(0,0,100,150);return c.toDataURL('image/jpeg').split(',')[1];});await page.setInputFiles('#photo-form [name=photo]',{name:'test.jpg',mimeType:'image/jpeg',buffer:Buffer.from(jpeg,'base64')});await page.click('#photo-form button');await page.waitForSelector('#frame-a img');assert.equal(await page.locator('#frame-b img').count(),1);assert.match(await page.locator('#photo-compare-note').innerText(),/mesma foto/);
+const downloadPromise=page.waitForEvent('download');await page.click('[data-download-photo="a"]');const downloaded=await downloadPromise;assert.match(downloaded.suggestedFilename(),/\.jpg$/);assert.equal(await downloaded.failure(),null);
+await page.click('#tab-guide');assert.equal(await page.locator('.photo-frame img').count(),0);assert.ok(await page.locator('.guide-layout').isVisible());
+await page.click('#tab-summary');await page.evaluate(()=>window.print=()=>{window.printed=document.querySelector('#print-content').textContent;});await page.click('#print-report');assert.match(await page.evaluate(()=>window.printed),/Mesma balança/);assert.match(await page.evaluate(()=>window.printed),/80/);
+await mkdir(new URL('../.qa/',import.meta.url),{recursive:true});
+await page.emulateMedia({media:'print'});assert.equal(await page.locator('main').isVisible(),false);assert.equal(await page.locator('#print-content').isVisible(),true);const pdf=await page.pdf({format:'A4',path:new URL('../.qa/report.pdf',import.meta.url).pathname.replace(/^\/([A-Z]:)/,'$1')});assert.ok(pdf.length>1000);await page.emulateMedia({media:'screen'});
+await page.screenshot({path:new URL('../.qa/dashboard.png',import.meta.url).pathname.replace(/^\/([A-Z]:)/,'$1'),fullPage:true});
+await page.setViewportSize({width:390,height:844});for(const id of ['summary','measures','composition','history','plan','photos','guide']){await page.click('#tab-'+id);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile '+id);}await page.screenshot({path:new URL('../.qa/mobile.png',import.meta.url).pathname.replace(/^\/([A-Z]:)/,'$1'),fullPage:true});
+await page.click('#tab-photos');await page.waitForSelector('#frame-a img');await page.click('[data-delete-photo="a"]');await page.waitForFunction(()=>document.querySelector('#photo-a').options.length===1);
+await page.click('#account-logout');await page.waitForSelector('#auth-screen');assert.equal(await page.locator('.photo-frame img').count(),0);assert.equal(await page.locator('.goal-card').count(),0);assert.equal(await page.locator('#print-content').innerHTML(),'');assert.deepEqual(errors,[]);
+console.log('Experience OK: wizard/context, regional comparison, graph touch, goals/reminder persistence, private photo upload/read/delete, report, mobile and logout cleanup.');
+}finally{await browser?.close();await new Promise(r=>server.close(r));}

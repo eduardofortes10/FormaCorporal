@@ -12,6 +12,27 @@ async function launch(options={}){const app=await createApp({origin,databasePath
 async function call(app,route,{method='GET',data,cookie,user,headers={}}={}){const res=await fetch(app.url+route,{method,headers:{Origin:origin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{}),...(user?{'X-Forma-User':user}:{}),...headers},body:data===undefined?undefined:JSON.stringify(data)});return {status:res.status,body:await res.json(),cookie:res.headers.get('set-cookie'),headers:res.headers};}
 async function register(app,email){const result=await call(app,'/api/register',{method:'POST',data:{email,password}});assert.equal(result.status,201);return {cookie:result.cookie.split(';')[0],user:result.body.user.id};}
 
+test('metas, contexto e fotos são privados; revisões concorrentes não sobrescrevem',async()=>{
+const app=await launch();try{
+const a=await register(app,'extras-a@example.com'),b=await register(app,'extras-b@example.com');
+const preferences={goals:[{id:'g',metric:'weight',target:80,date:'2027-01-01',startDate:'2026-01-01',baseline:75}],reminder:'2027-01-01'};
+const responses=await Promise.all([1,2].map(()=>call(app,'/api/preferences',{...a,method:'PUT',data:{revision:0,preferences}})));
+assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);
+assert.equal((await call(app,'/api/preferences',b)).body.preferences.goals.length,0);
+assert.equal((await call(app,'/api/preferences',{...b,user:a.user})).status,409);
+const photo={name:'2026-01-01_front_11111111-1111-4111-8111-111111111111.jpg',data:'data:image/jpeg;base64,/9j/AAAA'};
+assert.equal((await call(app,'/api/photos',{...a,method:'POST',data:photo})).status,200);
+assert.equal((await call(app,'/api/photos',b)).body.photos.length,0);
+assert.equal((await call(app,'/api/photos/read',{...b,method:'POST',data:{name:photo.name}})).status,404);
+await call(app,'/api/photos/remove',{...b,method:'POST',data:{name:photo.name}});
+assert.equal((await call(app,'/api/photos/read',{...a,method:'POST',data:{name:photo.name}})).body.url,photo.data);
+assert.equal((await call(app,'/api/photos/read',{...a,method:'POST',data:{name:'../outside.jpg'}})).status,400);
+const record={id:'context',date:'2026-01-01',notes:'',context:{time:'08:30',training:'before',conditions:'Mesma fita'}};
+assert.deepEqual((await call(app,'/api/assessments',{...a,method:'PUT',data:{revision:0,records:[record]}})).body.records[0].context,record.context);
+assert.equal((await call(app,'/api/assessments',{...a,method:'PUT',data:{revision:1,records:[{...record,context:{time:'25:00'}}]}})).status,400);
+}finally{await app.close();}
+});
+
 test('contas isoladas, origem, revisão e validação no servidor',async()=>{
   const app=await launch();try{
     assert.equal((await call(app,'/api/assessments')).status,401);

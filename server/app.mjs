@@ -7,6 +7,8 @@ import {openDatabase} from './database.mjs';
 import {hashPassword,checkPassword,validPassword,normalizeEmail,tokenHash,newToken,createLimiter} from './security.mjs';
 import {fields,validRecord,prepareRecord,estimateBF} from '../dist/calculations.js';
 
+import {emptyPreferences,validPreferences,validPhoto,photoName} from '../dist/experience-model.js';
+
 const publicDir=fileURLToPath(new URL('../dist/',import.meta.url));
 const MAX_BODY=2*1024*1024;
 const SESSION_AGE=7*24*60*60;
@@ -23,7 +25,7 @@ async function body(req){
 
 export function cleanRecords(records){
   if(!Array.isArray(records)||records.length>1000)throw fail(400,'O limite é de 1.000 avaliações por conta.');
-  const keys=['id','date','notes','sex','age',...Object.keys(fields)];
+  const keys=['id','date','notes','context','sex','age',...Object.keys(fields)];
   const result=records.map(record=>{
     if(!record||typeof record!=='object')throw fail(400,'Avaliação inválida.');
     const safe=Object.fromEntries(keys.filter(k=>Object.hasOwn(record,k)).map(k=>[k,record[k]]));
@@ -77,7 +79,7 @@ export async function createApp({databasePath='./data/forma.sqlite',origin='http
         }
         const user=session(req);if(!user)throw fail(401,'Entre na sua conta para continuar.');
         if(route==='/api/logout'&&req.method==='POST'){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(user.token_hash);cookie(res,'',0);return json(res,200,{ok:true});}
-        if(route==='/api/assessments'&&req.headers['x-forma-user']!==user.id)throw fail(409,'A conta mudou em outra aba. Recarregue a página antes de continuar.');
+        if(['/api/assessments','/api/preferences','/api/photos','/api/photos/read','/api/photos/remove'].includes(route)&&req.headers['x-forma-user']!==user.id)throw fail(409,'A conta mudou em outra aba. Recarregue a página antes de continuar.');
         if(route==='/api/assessments'&&req.method==='GET')return json(res,200,assessments(user));
         if(route==='/api/assessments'&&req.method==='PUT'){
           const data=await body(req);if(!Number.isSafeInteger(data.revision)||data.revision<0)throw fail(400,'Versão de dados inválida.');
@@ -91,10 +93,32 @@ export async function createApp({databasePath='./data/forma.sqlite',origin='http
           }catch(error){db.exec('ROLLBACK');throw error;}
           return json(res,200,{records,revision:data.revision+1});
         }
+        if(route==='/api/preferences'){
+          const row=db.prepare('SELECT payload,revision FROM preferences WHERE user_id=?').get(user.id);
+          if(req.method==='GET')return json(res,200,{preferences:row?JSON.parse(row.payload):emptyPreferences(),revision:row?.revision||0});
+          if(req.method==='PUT'){
+            const data=await body(req);if(!validPreferences(data.preferences))throw fail(400,'Metas ou lembrete inválidos.');
+            const current=db.prepare('SELECT revision FROM preferences WHERE user_id=?').get(user.id);
+            if(data.revision!==(current?.revision||0))throw fail(409,'Outra aba atualizou suas metas. Recarregue antes de salvar.');
+            db.prepare('INSERT INTO preferences VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET payload=excluded.payload,revision=excluded.revision').run(user.id,JSON.stringify(data.preferences),data.revision+1);
+            return json(res,200,{preferences:data.preferences,revision:data.revision+1});
+          }
+        }
+        if(route==='/api/photos'&&req.method==='GET')return json(res,200,{photos:db.prepare('SELECT name FROM photos WHERE user_id=? ORDER BY name').all(user.id)});
+        if(route.startsWith('/api/photos')&&req.method==='POST'){
+          const data=await body(req);if(!photoName.test(data.name||''))throw fail(400,'Foto inválida.');
+          if(route==='/api/photos'){
+            if(!validPhoto(data))throw fail(400,'Envie uma imagem JPEG de até 1 MB.');
+            if(db.prepare('SELECT count(*) AS count FROM photos WHERE user_id=?').get(user.id).count>=40)throw fail(400,'Limite de 40 fotos. Exclua uma antes de enviar outra.');
+            db.prepare('INSERT INTO photos VALUES (?,?,?)').run(user.id,data.name,data.data);return json(res,200,{ok:true});
+          }
+          if(route==='/api/photos/remove'){db.prepare('DELETE FROM photos WHERE user_id=? AND name=?').run(user.id,data.name);return json(res,200,{ok:true});}
+          if(route==='/api/photos/read'){const photo=db.prepare('SELECT data FROM photos WHERE user_id=? AND name=?').get(user.id,data.name);if(!photo)throw fail(404,'Foto não encontrada.');return json(res,200,{url:photo.data});}
+        }
         throw fail(404,'Rota não encontrada.');
       }
       if(!['GET','HEAD'].includes(req.method))throw fail(405,'Método não permitido.');
-      const allowed=new Set(['index.html','app.js','calculations.js','progress.js','progress-model.js','style.css','progress.css','storage.js','auth.css','refresh.css']);
+      const allowed=new Set(['index.html','app.js','calculations.js','progress.js','progress-model.js','style.css','progress.css','storage.js','auth.css','refresh.css','experience.js','experience-model.js','experience.css']);
       const filename=route==='/'?'index.html':route.slice(1);if(!allowed.has(filename))throw fail(404,'Arquivo não encontrado.');
       const data=await readFile(path.join(publicDir,filename));res.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[path.extname(filename)]);res.writeHead(200);res.end(req.method==='HEAD'?undefined:data);
     }catch(error){if(res.headersSent){res.end();return;}if(!error.status)console.error('Falha interna:',error.code||error.name);json(res,error.status||500,{error:error.status?error.message:'Não foi possível concluir a operação. Tente novamente.'});}

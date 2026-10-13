@@ -26,5 +26,5 @@ export function createStorage({onLoad,onClear,onMessage,transport=null}){
     finally{writing=false;$('#account-logout').disabled=false;$('#account-reload').disabled=false;}
   }
   $('#migrate-local').onclick=async()=>{const data=legacy();if(!data||!confirm(`Importar ${data.length} avaliação(ões) para a conta ${user.email}? Confirme que estes dados são seus.`))return;try{onLoad(await save(data));onMessage('Avaliações importadas para sua conta. A cópia antiga do navegador foi preservada.');}catch(error){onMessage(error.message);}};
-  return {save,async boot(){try{const data=await api('/api/session');$('#auth-toggle').hidden=!data.allowRegistration;if(data.user){user=data.user;await load();}else locked();}catch(error){locked();$('#auth-error').textContent=error.message;}}};
+  return {save,request:api,async boot(){try{const data=await api('/api/session');$('#auth-toggle').hidden=!data.allowRegistration;if(data.user){user=data.user;await load();}else locked();}catch(error){locked();$('#auth-error').textContent=error.message;}}};
 }

@@ -12,6 +12,7 @@ backups/
 *.db-*
 *.log
 coverage/
+.qa/
 test-results/
 playwright-report/
 .openai/

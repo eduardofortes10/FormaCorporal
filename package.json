@@ -13,9 +13,10 @@
     "test:vercel": "node scripts/vercel-browser-test.mjs",
     "start": "node --env-file-if-exists=.env server/index.mjs",
     "dev": "node --env-file-if-exists=.env --watch server/index.mjs",
-    "test": "node --test tests.mjs progress.test.mjs server/app.test.mjs",
+    "test": "node --test tests.mjs progress.test.mjs server/app.test.mjs experience.test.mjs",
     "backup": "node --env-file-if-exists=.env scripts/backup.mjs",
-    "test:browser": "node scripts/browser-test.mjs"
+    "test:browser": "node scripts/browser-test.mjs",
+    "test:experience": "node scripts/experience-browser-test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.9",
