@@ -1,0 +1,14 @@
+.git
+.github
+.openai
+.env
+.env.*
+node_modules
+data
+backups
+*.sqlite*
+*.db*
+*.log
+test-results
+playwright-report
+coverage

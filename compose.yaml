@@ -1,0 +1,16 @@
+services:
+  forma:
+    build: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      NODE_ENV: production
+      APP_ORIGIN: ${APP_ORIGIN:?Defina APP_ORIGIN com a URL HTTPS do site}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+    volumes:
+      - forma-data:/app/data
+      - ./backups:/app/backups
+volumes:
+  forma-data:
