@@ -1,6 +1,19 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {foldTransition,fatMassChange,comparisonReady,markerRadius} from './dist/progress-model.js';
+import {foldTransition,fatMassChange,comparisonReady,markerRadius,compositionChange} from './dist/progress-model.js';
+test('resumo conserva peso total e calcula médias pelo intervalo real',()=>{
+const base={sfChest:15,sfAxillary:15,sfTriceps:15,sfSubscapular:15,sfAbdomen:15,sfSuprailiac:15,sfThigh:15,age:30,sex:'male',weight:80};
+const first={...base,id:'first',date:'2026-01-01'},last={...base,id:'last',date:'2026-01-15',weight:82,sfAbdomen:10};
+const r=compositionChange(first,last);
+assert.equal(r.duration,14);assert.equal(r.weeklyWeight,1);assert.equal(r.weight.absolute,2);assert.ok(r.bf.absolute<0);
+assert.ok(Math.abs(r.fat.change+r.lean.change-2)<1e-10);assert.equal(r.lean.weekly,r.lean.change/2);
+assert.equal(compositionChange(first,{...last,weight:null}).lean,null);
+assert.equal(compositionChange(first,{...last,sfChest:null,fat:20}).fat,null);
+assert.equal(compositionChange(first,{...last,sex:'female'}).bf,null);
+assert.equal(compositionChange(first,{...last,age:17}).lean,null);
+assert.equal(compositionChange(last,first),null);assert.equal(compositionChange(first,first),null);
+const unchanged=compositionChange(first,{...first,id:'next',date:last.date});assert.equal(unchanged.lean.change,0);assert.equal(unchanged.bf.absolute,0);
+});
 const a={id:'a',date:'2026-01-01',sfAbdomen:20,sfChest:10},b={id:'b',date:'2026-02-01',sfAbdomen:10,sfTriceps:12};
 test('mapa preserva extremos e interpola somente pares medidos',()=>{const row=t=>foldTransition(a,b,t).find(x=>x.key==='sfAbdomen');assert.equal(row(0).value,20);assert.equal(row(.5).value,15);assert.equal(row(1).value,10);assert.equal(row(1).change.relative,-50);assert.equal(row(-1).value,20);assert.equal(row(2).value,10);const absent=foldTransition(a,b,.5).find(x=>x.key==='sfChest');assert.equal(absent.value,null);assert.equal(absent.change,null);assert.equal(foldTransition(a,b,1).find(x=>x.key==='sfTriceps').value,12)});
 test('comparação não aceita datas invertidas ou o mesmo registro',()=>{assert.equal(comparisonReady(a,b),true);assert.equal(comparisonReady(b,a),false);assert.equal(comparisonReady(a,a),false);assert.equal(comparisonReady(null,b),false)});
