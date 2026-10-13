@@ -8,6 +8,9 @@
     "node": ">=24.0.0 <25"
   },
   "scripts": {
+    "build": "node --env-file-if-exists=.env scripts/build-vercel.mjs",
+    "test:cloud": "node --test client/cloud.test.mjs",
+    "test:vercel": "node scripts/vercel-browser-test.mjs",
     "start": "node --env-file-if-exists=.env server/index.mjs",
     "dev": "node --env-file-if-exists=.env --watch server/index.mjs",
     "test": "node --test tests.mjs progress.test.mjs server/app.test.mjs",
@@ -15,6 +18,11 @@
     "test:browser": "node scripts/browser-test.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.9",
+    "esbuild": "0.28.2",
     "playwright": "1.64.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.3"
   }
 }

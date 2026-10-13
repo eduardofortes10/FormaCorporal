@@ -2,7 +2,7 @@
 
 Aplicação de acompanhamento corporal com contas individuais, avaliações por data, comparação de medidas, estimativa de BF e mapa interativo de dobras cutâneas.
 
-Esta versão está preparada para um repositório Git e hospedagem com servidor Node.js. O aplicativo publicado anteriormente no Sites continua sendo uma versão separada, com armazenamento no navegador. Esta atualização não foi publicada.
+Há duas opções de hospedagem: **Vercel + Supabase** (veja [VERCEL.md](VERCEL.md)) ou servidor Node.js + SQLite persistente (instruções abaixo). O aplicativo publicado anteriormente no Sites continua sendo uma versão separada. A versão Supabase exige criar o projeto, executar a migração SQL e configurar as variáveis na Vercel.
 
 ## Executar no computador
 
@@ -50,7 +50,7 @@ data/                    Banco criado em execução; ignorado pelo Git
 backups/                 Cópias locais; ignoradas pelo Git
 ```
 
-`dist/` contém o código-fonte do frontend neste projeto sem etapa de build. O runtime usa somente módulos nativos do Node; Playwright é uma dependência de desenvolvimento. `node:sqlite` pode emitir aviso de API experimental em versões do Node 24.
+`dist/` contém o código-fonte do frontend. A versão Node serve esses arquivos diretamente e o backend usa módulos nativos. Para Vercel, `npm run build` gera `vercel-dist/` e inclui o SDK Supabase no frontend. Playwright, esbuild e PGlite são dependências de desenvolvimento. `node:sqlite` pode emitir aviso de API experimental em versões do Node 24.
 
 ## Variáveis de ambiente
 

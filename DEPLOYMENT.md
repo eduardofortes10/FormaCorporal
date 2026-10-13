@@ -1,5 +1,7 @@
 # Hospedagem do Forma
 
+Para **Vercel + Supabase**, siga [VERCEL.md](VERCEL.md). As instruções abaixo são da alternativa Node.js + SQLite em disco persistente.
+
 ## Modelo suportado
 
 Um processo Node.js 24.x, servindo interface e API na mesma origem, com um arquivo SQLite em **volume persistente local**. O endereço público deve usar HTTPS por meio do proxy do provedor ou de um proxy reverso.
