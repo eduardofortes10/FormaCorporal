@@ -1,0 +1,4 @@
+export const fields = {weight:['Peso','kg'],waist:['Cintura','cm'],chest:['Peitoral','cm'],hip:['Quadril','cm'],arm:['Braço','cm'],thigh:['Coxa','cm'],calf:['Panturrilha','cm'],fat:['Gordura corporal','%']};
+export function delta(a,b){return Number.isFinite(a)&&Number.isFinite(b)?{absolute:b-a,relative:a===0?null:(b-a)/a*100}:null}
+export function days(a,b){return Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000)}
+export function validRecord(r){return r&&typeof r.id==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&new Date(r.date+'T00:00:00Z').toISOString().slice(0,10)===r.date&&Object.keys(fields).some(k=>r[k]!=null)&&Object.keys(fields).every(k=>r[k]==null||(Number.isFinite(r[k])&&r[k]>0&&(k!=='fat'||r[k]<100)))&&typeof r.notes==='string'&&r.notes.length<=1000;}
